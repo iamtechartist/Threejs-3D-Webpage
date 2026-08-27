@@ -1,0 +1,2111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#05050b" />
+  <meta name="color-scheme" content="dark" />
+  <title>IRIS — Articulated Kinetic Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.3.25/dist/lenis.css" />
+  <style>
+    :root {
+      --bg: #05050b;
+      --ink: rgba(244, 250, 255, 0.96);
+      --muted: rgba(226, 239, 248, 0.58);
+      --faint: rgba(220, 235, 245, 0.34);
+      --cyan: #a9f5ff;
+      --violet: #c7b7ff;
+      --glass: rgba(255, 255, 255, 0.026);
+      --glass-deep: rgba(8, 10, 18, 0.16);
+      --glass-line: rgba(228, 248, 255, 0.16);
+      --glass-line-strong: rgba(236, 252, 255, 0.28);
+      --pad: clamp(18px, 4.2vmin, 68px);
+      --header-top: max(12px, env(safe-area-inset-top));
+      --radius: clamp(18px, 2.2vw, 28px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      width: 100%;
+      background: var(--bg);
+      scroll-behavior: auto;
+      scroll-snap-type: none;
+    }
+
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 50% 30%, rgba(83, 63, 144, 0.13), transparent 35%),
+        radial-gradient(circle at 35% 60%, rgba(42, 179, 197, 0.08), transparent 32%),
+        var(--bg);
+      font-family: Manrope, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body.is-loading { overflow: hidden; }
+
+    ::selection {
+      color: #05050b;
+      background: rgba(180, 246, 255, 0.92);
+    }
+
+    button, a { -webkit-tap-highlight-color: transparent; }
+
+    #scene-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+      touch-action: pan-y;
+    }
+
+    .fallback-field,
+    .screen-fx,
+    .screen-fx::before,
+    .screen-fx::after {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .fallback-field {
+      z-index: -1;
+      background:
+        radial-gradient(circle at 62% 46%, rgba(205, 249, 255, 0.13) 0 1%, transparent 1.5%),
+        radial-gradient(circle at 62% 46%, transparent 0 10%, rgba(170, 239, 255, 0.13) 10.4% 10.8%, transparent 11.4%),
+        radial-gradient(circle at 62% 46%, rgba(122, 91, 214, 0.12), transparent 29%),
+        linear-gradient(180deg, #07070d, #030407 70%);
+    }
+
+    .screen-fx {
+      z-index: 1;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(2, 2, 7, 0.36), transparent 18%, transparent 82%, rgba(2, 2, 7, 0.42)),
+        radial-gradient(ellipse at 50% 46%, transparent 26%, rgba(2, 2, 7, 0.16) 62%, rgba(2, 2, 7, 0.84) 126%);
+    }
+
+    .screen-fx::before {
+      content: "";
+      opacity: 0.18;
+      background:
+        linear-gradient(90deg,
+          transparent 0 41%,
+          rgba(184, 241, 255, 0.025) 47%,
+          rgba(222, 252, 255, 0.08) 50%,
+          rgba(184, 241, 255, 0.025) 53%,
+          transparent 59% 100%);
+      mask-image: linear-gradient(180deg, transparent, #000 20% 78%, transparent);
+      -webkit-mask-image: linear-gradient(180deg, transparent, #000 20% 78%, transparent);
+    }
+
+    .screen-fx::after {
+      content: "";
+      opacity: 0.065;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.56'/%3E%3C/svg%3E");
+      mix-blend-mode: screen;
+    }
+
+    #site {
+      position: relative;
+      z-index: 3;
+      isolation: isolate;
+    }
+
+    .progress-track {
+      position: fixed;
+      z-index: 40;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(231, 248, 255, 0.08);
+      pointer-events: none;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 100%;
+      transform: scaleX(0);
+      transform-origin: left;
+      background: linear-gradient(90deg, var(--cyan), var(--violet));
+      box-shadow: 0 0 14px rgba(154, 239, 255, 0.72);
+      will-change: transform;
+    }
+
+    .site-header {
+      position: fixed;
+      z-index: 35;
+      top: var(--header-top);
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .header-shell {
+      width: min(1120px, 100%);
+      min-height: 48px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 7px 6px 15px;
+      border: 1px solid var(--glass-line);
+      border-radius: 17px;
+      background:
+        linear-gradient(110deg, rgba(255, 255, 255, 0.09), transparent 23%, transparent 72%, rgba(192, 174, 255, 0.06)),
+        rgba(8, 10, 17, 0.23);
+      box-shadow:
+        0 18px 48px rgba(0, 0, 0, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 0 rgba(159, 236, 255, 0.04);
+      backdrop-filter: blur(20px) saturate(145%) brightness(1.04);
+      -webkit-backdrop-filter: blur(20px) saturate(145%) brightness(1.04);
+      pointer-events: auto;
+    }
+
+    .brand {
+      width: max-content;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      position: relative;
+      width: 13px;
+      height: 13px;
+      border: 1px solid rgba(203, 246, 255, 0.7);
+      border-radius: 50%;
+      box-shadow: 0 0 14px rgba(154, 240, 255, 0.26);
+    }
+
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: inherit;
+      background: var(--cyan);
+      box-shadow: 0 0 8px rgba(154, 240, 255, 0.86);
+    }
+
+    .mono,
+    .brand-name,
+    .nav-link,
+    .eyebrow,
+    .meta,
+    .metric-label,
+    .footer-note,
+    .cue-label {
+      font-family: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    .brand-name {
+      font-size: 9px;
+      font-weight: 500;
+    }
+
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .nav-link {
+      position: relative;
+      min-width: 39px;
+      min-height: 34px;
+      display: grid;
+      place-items: center;
+      padding: 0 11px;
+      border-radius: 11px;
+      color: rgba(232, 247, 252, 0.42);
+      font-size: 8px;
+      text-decoration: none;
+      transition: color 220ms ease, background 220ms ease;
+    }
+
+    .nav-link:hover,
+    .nav-link[aria-current="true"] {
+      color: rgba(244, 253, 255, 0.94);
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .header-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .icon-button {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      color: rgba(239, 251, 255, 0.72);
+      background: transparent;
+      cursor: pointer;
+      transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms ease;
+    }
+
+    .icon-button:hover {
+      color: #fff;
+      border-color: rgba(233, 250, 255, 0.13);
+      background: rgba(255, 255, 255, 0.05);
+      transform: translateY(-1px);
+    }
+
+    .icon-button svg { width: 15px; height: 15px; }
+    .pause-icon .play { display: none; }
+    .icon-button.is-paused .pause { display: none; }
+    .icon-button.is-paused .play { display: block; }
+
+    .site-section {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      height: 100svh;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    .section-frame {
+      width: min(1240px, 100%);
+      height: 100%;
+      margin: 0 auto;
+      padding:
+        clamp(76px, 11vh, 118px)
+        var(--pad)
+        clamp(34px, 7vh, 72px);
+      display: grid;
+      align-content: center;
+    }
+
+    .hero-frame {
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 0.44fr);
+      align-items: center;
+      gap: clamp(26px, 5vw, 84px);
+    }
+
+    .hero-copy { align-self: center; }
+
+    .eyebrow {
+      margin: 0 0 clamp(12px, 2vh, 23px);
+      color: rgba(218, 241, 248, 0.56);
+      font-size: clamp(8px, 0.72vw, 10px);
+      font-weight: 500;
+    }
+
+    .eyebrow::before {
+      content: "";
+      display: inline-block;
+      width: 20px;
+      height: 1px;
+      margin-right: 10px;
+      vertical-align: middle;
+      background: linear-gradient(90deg, var(--cyan), transparent);
+      box-shadow: 0 0 8px rgba(160, 243, 255, 0.45);
+    }
+
+    .outline-title {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.012);
+      font-size: clamp(4.5rem, 15.5vmin, 11.8rem);
+      font-weight: 600;
+      letter-spacing: -0.075em;
+      line-height: 0.73;
+      -webkit-text-stroke: clamp(1.1px, 0.11vw, 1.8px) rgba(227, 250, 255, 0.88);
+      paint-order: stroke fill;
+      text-shadow:
+        0 0 20px rgba(166, 241, 255, 0.13),
+        0 0 58px rgba(162, 149, 255, 0.08);
+    }
+
+    .hero-kicker {
+      max-width: 620px;
+      margin: clamp(18px, 3vh, 34px) 0 0;
+      color: rgba(237, 248, 252, 0.78);
+      font-size: clamp(1rem, 1.55vw, 1.36rem);
+      font-weight: 500;
+      line-height: 1.42;
+      letter-spacing: -0.025em;
+    }
+
+    .liquid-glass {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--glass-line);
+      background:
+        radial-gradient(130% 100% at 0% 0%, rgba(255, 255, 255, 0.10), transparent 38%),
+        radial-gradient(100% 90% at 100% 100%, rgba(178, 161, 255, 0.055), transparent 56%),
+        linear-gradient(120deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008) 50%, rgba(124, 235, 255, 0.018)),
+        var(--glass-deep);
+      box-shadow:
+        0 22px 64px rgba(0, 0, 0, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 0 rgba(182, 239, 255, 0.035);
+      backdrop-filter: blur(17px) saturate(150%) brightness(1.06);
+      -webkit-backdrop-filter: blur(17px) saturate(150%) brightness(1.06);
+    }
+
+    .liquid-glass::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background:
+        linear-gradient(120deg, rgba(255,255,255,0.12), transparent 18%, transparent 72%, rgba(183, 167, 255, 0.06)),
+        radial-gradient(70% 50% at 14% 0%, rgba(215, 250, 255, 0.13), transparent 62%);
+      opacity: 0.55;
+      mix-blend-mode: screen;
+    }
+
+    .intro-card {
+      width: min(100%, 340px);
+      justify-self: end;
+      padding: clamp(18px, 2.3vw, 28px);
+      border-radius: var(--radius);
+    }
+
+    .intro-card > *, .field-card > *, .signal-card > * { position: relative; z-index: 1; }
+
+    .meta {
+      margin: 0 0 20px;
+      color: rgba(223, 245, 250, 0.43);
+      font-size: 8px;
+    }
+
+    .intro-card p {
+      margin: 0;
+      color: rgba(229, 242, 248, 0.65);
+      font-size: clamp(0.86rem, 1.08vw, 0.98rem);
+      line-height: 1.68;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: clamp(20px, 3.5vh, 32px);
+    }
+
+    .button {
+      position: relative;
+      min-height: 43px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 18px;
+      border: 1px solid rgba(228, 249, 255, 0.18);
+      border-radius: 14px;
+      color: rgba(241, 252, 255, 0.88);
+      background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018)),
+        rgba(7, 10, 18, 0.2);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 13px 34px rgba(0, 0, 0, 0.16);
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      font: 500 9px/1 "DM Mono", ui-monospace, monospace;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 190ms ease, border-color 190ms ease, color 190ms ease, background 190ms ease;
+    }
+
+    .button::after {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 9px currentColor;
+      opacity: 0.75;
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+      border-color: rgba(230, 251, 255, 0.34);
+      color: #fff;
+      background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025)),
+        rgba(8, 12, 20, 0.28);
+    }
+
+    .button-primary {
+      color: #081015;
+      border-color: rgba(216, 250, 255, 0.76);
+      background: linear-gradient(115deg, rgba(221, 252, 255, 0.94), rgba(199, 185, 255, 0.88));
+      box-shadow: 0 14px 38px rgba(110, 221, 242, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    .button-primary:hover {
+      color: #05090d;
+      border-color: #fff;
+      background: linear-gradient(115deg, #effdff, #d9ceff);
+    }
+
+    .scroll-cue {
+      position: absolute;
+      z-index: 5;
+      left: var(--pad);
+      bottom: max(18px, env(safe-area-inset-bottom));
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      color: rgba(231, 248, 252, 0.7);
+      transition: opacity 280ms ease, transform 280ms ease;
+    }
+
+    .mouse {
+      position: relative;
+      width: 19px;
+      height: 29px;
+      border: 1px solid rgba(230, 249, 255, 0.58);
+      border-radius: 12px;
+      box-shadow: 0 0 16px rgba(160, 239, 255, 0.12);
+    }
+
+    .mouse::after {
+      content: "";
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      width: 2px;
+      height: 5px;
+      border-radius: 2px;
+      background: rgba(237, 252, 255, 0.92);
+      box-shadow: 0 0 8px rgba(168, 242, 255, 0.76);
+      transform: translateX(-50%);
+      animation: mouseWheel 1.75s cubic-bezier(.2,.65,.35,1) infinite;
+    }
+
+    .cue-label { font-size: 8px; }
+
+    @keyframes mouseWheel {
+      0% { transform: translate(-50%, 0); opacity: 0; }
+      20% { opacity: 1; }
+      75% { opacity: 0.55; }
+      100% { transform: translate(-50%, 9px); opacity: 0; }
+    }
+
+    .field-frame {
+      grid-template-columns: minmax(0, 0.72fr) minmax(340px, 0.56fr);
+      align-items: center;
+      gap: clamp(30px, 7vw, 116px);
+    }
+
+    .section-title {
+      max-width: 770px;
+      margin: 0;
+      font-size: clamp(2.9rem, 8.2vmin, 7.1rem);
+      font-weight: 500;
+      letter-spacing: -0.07em;
+      line-height: 0.93;
+    }
+
+    .section-title .outline {
+      color: rgba(255,255,255,0.01);
+      -webkit-text-stroke: 1.25px rgba(227, 249, 255, 0.75);
+      text-shadow: 0 0 24px rgba(175, 239, 255, 0.08);
+    }
+
+    .field-card {
+      justify-self: end;
+      width: min(100%, 440px);
+      padding: clamp(20px, 3vw, 34px);
+      border-radius: var(--radius);
+    }
+
+    .field-intro {
+      margin: 0 0 clamp(18px, 3vh, 28px);
+      color: rgba(232, 245, 250, 0.68);
+      font-size: clamp(0.9rem, 1.15vw, 1.03rem);
+      line-height: 1.68;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      min-height: 92px;
+      padding: 14px 12px;
+      border: 1px solid rgba(228, 248, 255, 0.1);
+      border-radius: 15px;
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    .metric-value {
+      display: block;
+      margin-bottom: 15px;
+      color: rgba(243, 253, 255, 0.92);
+      font-size: clamp(1.05rem, 1.6vw, 1.45rem);
+      font-weight: 500;
+      letter-spacing: -0.04em;
+    }
+
+    .metric-label {
+      color: rgba(221, 241, 247, 0.4);
+      font-size: 7px;
+      line-height: 1.5;
+    }
+
+    .signal-frame {
+      grid-template-columns: minmax(0, 0.84fr) minmax(280px, 0.46fr);
+      align-items: center;
+      gap: clamp(30px, 7vw, 110px);
+    }
+
+    .signal-title {
+      max-width: 860px;
+      margin: 0;
+      font-size: clamp(3.1rem, 9.2vmin, 8rem);
+      font-weight: 500;
+      letter-spacing: -0.072em;
+      line-height: 0.89;
+    }
+
+    .signal-title span {
+      display: block;
+      color: rgba(255,255,255,0.01);
+      -webkit-text-stroke: 1.25px rgba(217, 246, 255, 0.73);
+    }
+
+    .signal-card {
+      justify-self: end;
+      width: min(100%, 365px);
+      padding: clamp(20px, 2.7vw, 31px);
+      border-radius: var(--radius);
+    }
+
+    .signal-card p {
+      margin: 0;
+      color: rgba(232, 245, 250, 0.67);
+      font-size: clamp(0.9rem, 1.12vw, 1rem);
+      line-height: 1.7;
+    }
+
+    .section-footer {
+      position: absolute;
+      z-index: 6;
+      left: var(--pad);
+      right: var(--pad);
+      bottom: max(13px, env(safe-area-inset-bottom));
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      min-height: 34px;
+      padding: 7px 12px;
+      border-radius: 12px;
+      background: rgba(6, 8, 15, 0.16);
+      border: 1px solid rgba(228, 248, 255, 0.11);
+      backdrop-filter: blur(13px) saturate(140%);
+      -webkit-backdrop-filter: blur(13px) saturate(140%);
+    }
+
+    .footer-note {
+      color: rgba(229, 246, 251, 0.52);
+      font-size: 7px;
+      white-space: nowrap;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      filter: blur(7px);
+      transition:
+        opacity 800ms cubic-bezier(.2,.7,.2,1),
+        transform 900ms cubic-bezier(.2,.7,.2,1),
+        filter 900ms cubic-bezier(.2,.7,.2,1);
+      transition-delay: calc(var(--delay, 0) * 90ms);
+    }
+
+    .is-visible .reveal,
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+
+    #loader {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      color: rgba(235, 250, 255, 0.72);
+      background:
+        radial-gradient(circle at 50% 46%, rgba(114, 91, 180, 0.15), transparent 27%),
+        #05050b;
+      transition: opacity 650ms ease, visibility 650ms ease;
+    }
+
+    #loader.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loader-core {
+      display: grid;
+      justify-items: center;
+      gap: 16px;
+    }
+
+    .loader-orbit {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      border: 1px solid rgba(222, 248, 255, 0.18);
+      border-radius: 50%;
+      animation: loaderSpin 1.7s linear infinite;
+    }
+
+    .loader-orbit::before,
+    .loader-orbit::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+    }
+
+    .loader-orbit::before {
+      inset: 9px;
+      border: 1px solid rgba(203, 184, 255, 0.38);
+      transform: rotateX(68deg);
+    }
+
+    .loader-orbit::after {
+      width: 5px;
+      height: 5px;
+      top: -3px;
+      left: calc(50% - 2px);
+      background: var(--cyan);
+      box-shadow: 0 0 13px rgba(158, 241, 255, 0.9);
+    }
+
+    .loader-label {
+      font: 500 8px/1 "DM Mono", monospace;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    @keyframes loaderSpin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 900px) {
+      .header-shell { grid-template-columns: 1fr auto; }
+      .site-nav { display: none; }
+      .hero-frame,
+      .field-frame,
+      .signal-frame {
+        grid-template-columns: 1fr;
+        align-content: center;
+        gap: clamp(18px, 4vh, 30px);
+      }
+      .intro-card,
+      .field-card,
+      .signal-card {
+        justify-self: start;
+        width: min(100%, 560px);
+      }
+      .hero-kicker { max-width: 520px; }
+      .field-copy { max-width: 720px; }
+      .section-footer { left: 16px; right: 16px; }
+    }
+
+    @media (max-width: 620px) {
+      :root { --pad: 18px; }
+      .site-header { left: 10px; right: 10px; }
+      .header-shell { min-height: 45px; padding-left: 12px; border-radius: 15px; }
+      .brand-name { font-size: 8px; letter-spacing: 0.14em; }
+      .section-frame {
+        padding-top: clamp(70px, 10vh, 88px);
+        padding-bottom: clamp(48px, 7vh, 64px);
+      }
+      .outline-title { font-size: clamp(4rem, 23vw, 7rem); line-height: 0.76; }
+      .hero-kicker { font-size: clamp(0.92rem, 4vw, 1.08rem); }
+      .intro-card, .field-card, .signal-card { padding: 17px; border-radius: 19px; }
+      .section-title { font-size: clamp(2.75rem, 15vw, 5rem); }
+      .signal-title { font-size: clamp(3rem, 16vw, 5.4rem); }
+      .metrics { gap: 6px; }
+      .metric { min-height: 78px; padding: 11px 9px; border-radius: 13px; }
+      .metric-value { margin-bottom: 12px; }
+      .actions { margin-top: 18px; }
+      .button { min-height: 41px; padding: 0 14px; font-size: 8px; }
+      .scroll-cue { bottom: 14px; }
+      .section-footer { bottom: 10px; padding: 6px 9px; }
+      .footer-note:last-child { display: none; }
+
+      .hero-frame {
+        align-content: space-between;
+        gap: 16px;
+        padding-top: clamp(138px, 18vh, 162px);
+        padding-bottom: clamp(132px, 17vh, 154px);
+      }
+
+      .field-frame {
+        align-content: space-between;
+        gap: 14px;
+        padding-top: clamp(126px, 16vh, 146px);
+        padding-bottom: clamp(96px, 12vh, 112px);
+      }
+
+      .signal-frame {
+        align-content: space-between;
+        gap: 12px;
+        padding-top: clamp(92px, 12vh, 108px);
+        padding-bottom: clamp(88px, 11vh, 102px);
+      }
+
+      .signal-title { font-size: clamp(2.8rem, 13.2vw, 4.4rem); }
+      .signal-card { background-color: rgba(9, 11, 8, 0.08); }
+    }
+
+    @media (max-height: 720px) {
+      .section-frame { padding-top: 66px; padding-bottom: 42px; }
+      .eyebrow { margin-bottom: 9px; }
+      .hero-kicker { margin-top: 14px; }
+      .intro-card, .field-card, .signal-card { padding: 15px 17px; }
+      .meta { margin-bottom: 12px; }
+      .intro-card p, .field-intro, .signal-card p { line-height: 1.5; }
+      .field-intro { margin-bottom: 13px; }
+      .metric { min-height: 72px; padding: 10px; }
+      .metric-value { margin-bottom: 8px; }
+      .actions { margin-top: 14px; }
+      .button { min-height: 39px; }
+    }
+
+    @media (max-height: 560px) and (orientation: landscape) {
+      .site-header { top: 7px; }
+      .header-shell { min-height: 40px; }
+      .section-frame { padding-top: 52px; padding-bottom: 28px; }
+      .hero-frame, .field-frame, .signal-frame {
+        grid-template-columns: minmax(0, 1fr) minmax(250px, 0.52fr);
+        gap: 28px;
+      }
+      .outline-title { font-size: clamp(3.7rem, 22vh, 7rem); }
+      .section-title { font-size: clamp(2.7rem, 15vh, 5rem); }
+      .signal-title { font-size: clamp(2.8rem, 16vh, 5.2rem); }
+      .hero-kicker { margin-top: 10px; font-size: 0.9rem; }
+      .intro-card, .field-card, .signal-card { justify-self: end; padding: 13px 15px; }
+      .intro-card p, .field-intro, .signal-card p { font-size: 0.78rem; line-height: 1.42; }
+      .metrics { grid-template-columns: repeat(3, 1fr); }
+      .metric { min-height: 60px; padding: 8px; }
+      .metric-value { font-size: 0.95rem; margin-bottom: 5px; }
+      .actions { margin-top: 10px; }
+      .button { min-height: 36px; }
+      .scroll-cue { display: none; }
+      .section-footer { bottom: 6px; min-height: 28px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+      .reveal { opacity: 1; transform: none; filter: none; }
+    }
+
+    @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+      .liquid-glass, .header-shell, .section-footer, .button {
+        background: rgba(8, 10, 17, 0.84);
+      }
+    }
+  </style>
+
+  <style>
+    :root {
+      --bg: #070806;
+      --ink: rgba(250, 247, 238, 0.97);
+      --muted: rgba(239, 235, 220, 0.60);
+      --faint: rgba(229, 226, 211, 0.36);
+      --cyan: #f4d4a4;
+      --violet: #9fd8d1;
+      --glass: rgba(255, 250, 236, 0.022);
+      --glass-deep: rgba(12, 14, 11, 0.13);
+      --glass-line: rgba(244, 235, 211, 0.15);
+      --glass-line-strong: rgba(255, 243, 216, 0.28);
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 66% 38%, rgba(119, 169, 153, 0.12), transparent 31%),
+        radial-gradient(circle at 40% 64%, rgba(196, 145, 87, 0.09), transparent 34%),
+        linear-gradient(180deg, #090a08, #050604 72%);
+    }
+
+    .fallback-field {
+      background:
+        radial-gradient(ellipse at 63% 48%, rgba(255, 221, 167, 0.16) 0 2%, transparent 3.2%),
+        radial-gradient(ellipse at 63% 58%, rgba(116, 187, 175, 0.09), transparent 25%),
+        conic-gradient(from 12deg at 63% 58%, transparent 0 7%, rgba(238, 213, 171, 0.035) 7.3% 7.8%, transparent 8.1% 15%),
+        linear-gradient(180deg, #0a0b08, #040503 72%);
+    }
+
+    .screen-fx {
+      background:
+        linear-gradient(90deg, rgba(4, 5, 3, 0.42), transparent 19%, transparent 82%, rgba(4, 5, 3, 0.48)),
+        radial-gradient(ellipse at 56% 48%, transparent 24%, rgba(5, 6, 4, 0.14) 62%, rgba(3, 4, 2, 0.86) 128%);
+    }
+
+    .screen-fx::before {
+      opacity: 0.15;
+      background:
+        linear-gradient(90deg,
+          transparent 0 42%,
+          rgba(248, 224, 184, 0.018) 47%,
+          rgba(255, 244, 220, 0.075) 50%,
+          rgba(170, 223, 214, 0.018) 53%,
+          transparent 58% 100%);
+    }
+
+    .progress-bar {
+      background: linear-gradient(90deg, #f2d2a0, #a5ddd5);
+      box-shadow: 0 0 14px rgba(240, 207, 155, 0.52);
+    }
+
+    .brand-mark {
+      border-color: rgba(244, 220, 178, 0.76);
+      border-radius: 42% 58% 50% 50%;
+      transform: rotate(45deg);
+      box-shadow: 0 0 14px rgba(238, 204, 151, 0.24);
+    }
+
+    .brand-mark::after {
+      background: #f3d29f;
+      box-shadow: 0 0 9px rgba(243, 210, 159, 0.82);
+    }
+
+    .outline-title,
+    .section-title .outline {
+      -webkit-text-stroke-color: rgba(250, 239, 215, 0.84);
+      text-shadow:
+        0 0 1px rgba(255,255,255,.55),
+        0 0 18px rgba(239, 203, 149, .14),
+        0 20px 60px rgba(0,0,0,.45);
+    }
+
+    .header-shell,
+    .liquid-glass {
+      background:
+        linear-gradient(116deg, rgba(255, 247, 226, 0.07), transparent 24%, transparent 72%, rgba(151, 208, 198, 0.045)),
+        rgba(10, 12, 9, 0.16);
+      backdrop-filter: blur(18px) saturate(132%) brightness(1.03);
+      -webkit-backdrop-filter: blur(18px) saturate(132%) brightness(1.03);
+    }
+
+    .button-primary {
+      color: #11120f;
+      background: linear-gradient(135deg, rgba(255, 239, 206, 0.95), rgba(179, 221, 211, 0.88));
+      border-color: rgba(255, 246, 226, 0.72);
+      box-shadow: 0 9px 34px rgba(217, 181, 125, 0.13), inset 0 1px 0 rgba(255,255,255,.72);
+    }
+
+    .mouse::after {
+      background: linear-gradient(180deg, #f4d2a0, #a5ddd5);
+      box-shadow: 0 0 9px rgba(240, 207, 155, 0.62);
+    }
+  </style>
+
+</head>
+<body class="is-loading" data-section="0">
+  <div class="fallback-field" aria-hidden="true"></div>
+  <div id="loader" role="status" aria-live="polite">
+    <div class="loader-core">
+      <div class="loader-orbit" aria-hidden="true"></div>
+      <div class="loader-label">Opening the iris</div>
+    </div>
+  </div>
+
+  <div class="screen-fx" aria-hidden="true"></div>
+  <div class="progress-track" aria-hidden="true"><div id="progress" class="progress-bar"></div></div>
+
+  <div id="site">
+    <header class="site-header">
+      <div class="header-shell">
+        <a class="brand" href="#threshold" data-scroll-to aria-label="Iris home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-name">Iris / Study 02</span>
+        </a>
+
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a class="nav-link" href="#threshold" data-scroll-to aria-current="true">01</a>
+          <a class="nav-link" href="#field" data-scroll-to>02</a>
+          <a class="nav-link" href="#signal" data-scroll-to>03</a>
+        </nav>
+
+        <div class="header-actions">
+          <button id="pause" class="icon-button pause-icon" type="button" aria-label="Pause animation" aria-pressed="false">
+            <svg class="pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
+            <svg class="play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" /></svg>
+          </button>
+          <button id="reset" class="icon-button" type="button" aria-label="Reset bloom">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="threshold" class="site-section is-visible" data-index="0" aria-labelledby="hero-title">
+        <div class="section-frame hero-frame">
+          <div class="hero-copy">
+            <p class="eyebrow reveal">A study in responsive form</p>
+            <h1 id="hero-title" class="outline-title reveal" style="--delay:1">IRIS</h1>
+            <p class="hero-kicker reveal" style="--delay:2">An articulated kinetic bloom shaped by tension, reflected light and controlled release.</p>
+          </div>
+
+          <aside class="intro-card liquid-glass reveal" style="--delay:3">
+            <p class="meta">Articulated system / Dormant</p>
+            <p>Move through three states as layered iridescent blades, inner vanes and a gyroscopic glass core unfold in sequence.</p>
+            <div class="actions">
+              <button class="button button-primary" type="button" data-target="#field">Begin unfolding</button>
+            </div>
+          </aside>
+        </div>
+
+        <div id="scroll-cue" class="scroll-cue" aria-hidden="true">
+          <span class="mouse"></span>
+          <span class="cue-label">Scroll</span>
+        </div>
+      </section>
+
+      <section id="field" class="site-section" data-index="1" aria-labelledby="field-title">
+        <div class="section-frame field-frame">
+          <div class="field-copy">
+            <p class="eyebrow reveal">Phase one / Tension</p>
+            <h2 id="field-title" class="section-title reveal" style="--delay:1">Pressure becomes <span class="outline">shape.</span></h2>
+          </div>
+
+          <div class="field-card liquid-glass reveal" style="--delay:2">
+            <p class="field-intro">Each blade is built as a closed shell with a luminous spine, edge rails and a mechanical hinge. Eight inner vanes answer the outer ring in a delayed counter-motion.</p>
+            <div class="metrics">
+              <div class="metric">
+                <span class="metric-value">12</span>
+                <span class="metric-label">Articulated<br />blades</span>
+              </div>
+              <div class="metric">
+                <span class="metric-value">08</span>
+                <span class="metric-label">Inner<br />vanes</span>
+              </div>
+              <div class="metric">
+                <span class="metric-value">03</span>
+                <span class="metric-label">Gyro<br />axes</span>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="button" type="button" data-target="#signal">Open the iris</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="signal" class="site-section" data-index="2" aria-labelledby="signal-title">
+        <div class="section-frame signal-frame">
+          <div>
+            <p class="eyebrow reveal">Phase two / Release</p>
+            <h2 id="signal-title" class="signal-title reveal" style="--delay:1">Open slowly. <span>Hold the light.</span></h2>
+          </div>
+
+          <div class="signal-card liquid-glass reveal" style="--delay:2">
+            <p>The final state reveals a nested luminous core: counter-rotating cages, three gyroscopic axes and orbiting sparks held inside the articulated bloom.</p>
+            <div class="actions">
+              <button id="restart" class="button button-primary" type="button">Close the bloom</button>
+              <button id="reset-view" class="button" type="button">Reset motion</button>
+            </div>
+          </div>
+        </div>
+
+        <footer class="section-footer" aria-label="Site footer">
+          <span class="footer-note">&copy; <span id="current-year">2026</span> Techartist</span>
+          <span class="footer-note">Iris · Kinetic study 02</span>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.webgpu.js",
+      "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.webgpu.js",
+      "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.tsl.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/",
+      "lenis": "https://cdn.jsdelivr.net/npm/lenis@1.3.25/dist/lenis.mjs"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three/webgpu';
+    import {
+      color,
+      float,
+      mix,
+      pass,
+      positionWorld,
+      range,
+      sin,
+      uniform,
+      uv,
+      vec3,
+      vec4
+    } from 'three/tsl';
+    import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+    import Lenis from 'lenis';
+
+    const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const loader = document.querySelector('#loader');
+    const progressBar = document.querySelector('#progress');
+    const scrollCue = document.querySelector('#scroll-cue');
+    const pauseButton = document.querySelector('#pause');
+    const resetButton = document.querySelector('#reset');
+    const resetViewButton = document.querySelector('#reset-view');
+    const restartButton = document.querySelector('#restart');
+    const navLinks = [...document.querySelectorAll('.nav-link')];
+    const sections = [...document.querySelectorAll('.site-section')];
+
+    let lenis = null;
+    let playing = !prefersReducedMotion;
+    let elapsed = 0;
+    let previousTime = performance.now();
+    let telemetryStamp = 0;
+    let sceneReady = false;
+
+    const scene = new THREE.Scene();
+    const bgA = new THREE.Color(0x070806);
+    const bgB = new THREE.Color(0x0b0d0a);
+    const bgC = new THREE.Color(0x0a0907);
+    const fogTint = new THREE.Color(0x141711);
+    scene.background = bgA.clone();
+    scene.fog = new THREE.FogExp2(0x0c0f0a, 0.014);
+
+    const aspect = innerWidth / innerHeight;
+    const camera = new THREE.PerspectiveCamera(aspect < 0.72 ? 48 : 39, aspect, 0.1, 180);
+    const rendererQuery = new URLSearchParams(location.search);
+    const forceWebGL = rendererQuery.get('backend') !== 'webgpu';
+
+    const renderer = new THREE.WebGPURenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: 'high-performance',
+      forceWebGL
+    });
+    const renderScale = () => Math.min(devicePixelRatio, innerWidth < 760 ? 1.0 : 1.18);
+    renderer.setPixelRatio(renderScale());
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.02;
+    renderer.domElement.id = 'scene-canvas';
+    renderer.domElement.setAttribute('aria-hidden', 'true');
+    document.body.prepend(renderer.domElement);
+
+    await renderer.init();
+
+    const timeNode = uniform(0);
+    const bloomNode = uniform(0);
+
+    const world = new THREE.Group();
+    const bloomRoot = new THREE.Group();
+    const coreRoot = new THREE.Group();
+    const floorRoot = new THREE.Group();
+    const atmosphereRoot = new THREE.Group();
+    world.add(floorRoot, atmosphereRoot, bloomRoot, coreRoot);
+    scene.add(world);
+
+    function petalPoint(t, s, length, widthScale) {
+      const arch = Math.sin(Math.PI * t);
+      const shoulder = Math.pow(arch, 0.58);
+      const taper = 1 - t * 0.16;
+      const width = (0.035 + shoulder * 1.58 * taper) * widthScale;
+      const twist = Math.sin(Math.PI * t) * (0.10 + widthScale * 0.035) + t * 0.035;
+      const lateral = s * width;
+      const channel = (1 - s * s) * arch * 0.18;
+      const edgeCurl = Math.pow(Math.abs(s), 2.35) * arch * 0.48;
+      const spineZ = arch * 0.74 + t * t * 1.52;
+      const ripple = Math.sin(t * Math.PI * 3.0) * 0.045 * (1 - Math.abs(s));
+      const x = lateral * Math.cos(twist);
+      const y = t * length + channel;
+      const z = spineZ + edgeCurl + ripple + lateral * Math.sin(twist);
+      return new THREE.Vector3(x, y, z);
+    }
+
+    function createPetalGeometry(length = 9.8, widthScale = 1, thickness = 0.085) {
+      const along = 72;
+      const across = 16;
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+      const row = across + 1;
+      const faceSize = (along + 1) * row;
+
+      for (let face = 0; face < 2; face++) {
+        const direction = face === 0 ? 1 : -1;
+        for (let iy = 0; iy <= along; iy++) {
+          const t = iy / along;
+          const shell = thickness * (0.34 + Math.sin(Math.PI * t) * 0.66);
+          for (let ix = 0; ix <= across; ix++) {
+            const s = ix / across * 2 - 1;
+            const point = petalPoint(t, s, length, widthScale);
+            positions.push(point.x, point.y, point.z + shell * direction);
+            uvs.push(ix / across, t);
+          }
+        }
+      }
+
+      for (let iy = 0; iy < along; iy++) {
+        for (let ix = 0; ix < across; ix++) {
+          const a = iy * row + ix;
+          const b = a + row;
+          const c = b + 1;
+          const d = a + 1;
+          indices.push(a, b, d, b, c, d);
+          indices.push(faceSize + a, faceSize + d, faceSize + b, faceSize + b, faceSize + d, faceSize + c);
+        }
+      }
+
+      for (let iy = 0; iy < along; iy++) {
+        const next = iy + 1;
+        for (const ix of [0, across]) {
+          const a = iy * row + ix;
+          const b = next * row + ix;
+          indices.push(a, faceSize + a, b, b, faceSize + a, faceSize + b);
+        }
+      }
+
+      for (const iy of [0, along]) {
+        for (let ix = 0; ix < across; ix++) {
+          const a = iy * row + ix;
+          const b = a + 1;
+          indices.push(a, b, faceSize + a, b, faceSize + b, faceSize + a);
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+      return geometry;
+    }
+
+    function createPetalRailGeometry(length, widthScale, lateral, radius) {
+      const points = [];
+      for (let i = 0; i <= 36; i++) {
+        const point = petalPoint(i / 36, lateral, length, widthScale);
+        point.z += 0.13;
+        points.push(point);
+      }
+      return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 64, radius, 7, false);
+    }
+
+    function makeGlowMaterial(phase) {
+      const sweep = sin(
+        positionWorld.y.mul(0.78)
+          .sub(timeNode.mul(0.72))
+          .add(positionWorld.x.mul(0.14))
+          .add(float(phase))
+      ).mul(0.5).add(0.5);
+      const filament = sweep.pow(12);
+      const material = new THREE.MeshBasicNodeMaterial({
+        transparent: true,
+        opacity: 0.11,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      material.colorNode = mix(color('#77b9af'), color('#ffe4b5'), sweep)
+        .mul(float(0.055).add(filament.mul(2.8)).add(bloomNode.mul(0.16)));
+      material.toneMapped = false;
+      return material;
+    }
+
+    const petalGeometry = createPetalGeometry(9.8, 1, 0.09);
+    const petalGeometryNarrow = createPetalGeometry(9.15, 0.86, 0.075);
+    const bladeParts = [
+      {
+        surface: petalGeometry,
+        spine: createPetalRailGeometry(9.8, 1, 0, 0.047),
+        edgeA: createPetalRailGeometry(9.8, 1, -0.965, 0.026),
+        edgeB: createPetalRailGeometry(9.8, 1, 0.965, 0.026)
+      },
+      {
+        surface: petalGeometryNarrow,
+        spine: createPetalRailGeometry(9.15, 0.86, 0, 0.042),
+        edgeA: createPetalRailGeometry(9.15, 0.86, -0.965, 0.023),
+        edgeB: createPetalRailGeometry(9.15, 0.86, 0.965, 0.023)
+      }
+    ];
+    const petalMaterialWarm = new THREE.MeshPhysicalMaterial({
+      color: 0x151711,
+      roughness: 0.17,
+      metalness: 0.79,
+      clearcoat: 1,
+      clearcoatRoughness: 0.055,
+      iridescence: 0.88,
+      iridescenceIOR: 1.28,
+      iridescenceThicknessRange: [110, 690],
+      side: THREE.DoubleSide
+    });
+    const petalMaterialCool = petalMaterialWarm.clone();
+    petalMaterialCool.color.set(0x101714);
+    petalMaterialCool.iridescenceThicknessRange = [180, 720];
+
+    const spineMaterialWarm = new THREE.MeshStandardMaterial({
+      color: 0xbba77f,
+      roughness: 0.20,
+      metalness: 0.88,
+      emissive: 0x8a5e28,
+      emissiveIntensity: 0.78
+    });
+    const spineMaterialCool = new THREE.MeshStandardMaterial({
+      color: 0x6b9e92,
+      roughness: 0.18,
+      metalness: 0.86,
+      emissive: 0x255f55,
+      emissiveIntensity: 0.92
+    });
+    const edgeMaterial = new THREE.MeshBasicMaterial({
+      color: 0xb9ddd2,
+      transparent: true,
+      opacity: 0.52,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false
+    });
+    const hingeMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x26332d,
+      roughness: 0.16,
+      metalness: 0.92,
+      clearcoat: 0.86,
+      clearcoatRoughness: 0.08
+    });
+    const hingeGlowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xe5c78f,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false
+    });
+    const hingeJointGeometry = new THREE.SphereGeometry(0.24, 18, 12);
+    const hingeAxleGeometry = new THREE.CylinderGeometry(0.075, 0.075, 0.92, 12);
+    const hingeRingGeometry = new THREE.TorusGeometry(0.34, 0.045, 8, 32);
+
+    const petals = [];
+    const petalCount = 12;
+    for (let i = 0; i < petalCount; i++) {
+      const angle = i / petalCount * Math.PI * 2;
+      const pivot = new THREE.Group();
+      pivot.rotation.order = 'YXZ';
+      pivot.position.y = -4.35;
+      pivot.rotation.y = angle;
+
+      const parts = bladeParts[i % 2];
+      const blade = new THREE.Group();
+      blade.position.z = 0.28;
+      blade.scale.y = 0.94 + (i % 4) * 0.025;
+
+      const surface = new THREE.Mesh(parts.surface, i % 3 === 0 ? petalMaterialCool : petalMaterialWarm);
+
+      const glow = new THREE.Mesh(parts.surface, makeGlowMaterial(angle));
+      glow.position.z = 0.018;
+      glow.scale.setScalar(1.003);
+      glow.renderOrder = 3;
+
+      const spine = new THREE.Mesh(parts.spine, i % 3 === 0 ? spineMaterialCool : spineMaterialWarm);
+      const edgeA = new THREE.Mesh(parts.edgeA, edgeMaterial);
+      const edgeB = new THREE.Mesh(parts.edgeB, edgeMaterial);
+      edgeA.renderOrder = edgeB.renderOrder = 4;
+      blade.add(surface, glow, spine, edgeA, edgeB);
+
+      const hinge = new THREE.Mesh(hingeJointGeometry, hingeMaterial);
+      hinge.position.set(0, 0.08, 0.35);
+      const axle = new THREE.Mesh(hingeAxleGeometry, hingeMaterial);
+      axle.position.copy(hinge.position);
+      axle.rotation.z = Math.PI * 0.5;
+      const hingeRing = new THREE.Mesh(hingeRingGeometry, hingeGlowMaterial);
+      hingeRing.position.copy(hinge.position);
+
+      pivot.add(blade, hinge, axle, hingeRing);
+      pivot.userData = {
+        angle,
+        index: i,
+        baseScale: blade.scale.y,
+        phase: (i % 2) * 0.035 + (i / petalCount) * 0.025,
+        blade,
+        surface,
+        glow,
+        hinge,
+        hingeRing
+      };
+      petals.push(pivot);
+      bloomRoot.add(pivot);
+    }
+
+    const innerRoot = new THREE.Group();
+    bloomRoot.add(innerRoot);
+    const innerVaneGeometry = createPetalGeometry(5.35, 0.52, 0.06);
+    const innerVaneSpineGeometry = createPetalRailGeometry(5.35, 0.52, 0, 0.036);
+    const innerVaneMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x313128,
+      roughness: 0.15,
+      metalness: 0.62,
+      clearcoat: 1,
+      clearcoatRoughness: 0.04,
+      iridescence: 0.72,
+      iridescenceIOR: 1.25,
+      iridescenceThicknessRange: [180, 510],
+      side: THREE.DoubleSide
+    });
+    const innerVanes = [];
+    const innerVaneCount = 8;
+    for (let i = 0; i < innerVaneCount; i++) {
+      const angle = i / innerVaneCount * Math.PI * 2 + Math.PI / innerVaneCount;
+      const pivot = new THREE.Group();
+      pivot.rotation.order = 'YXZ';
+      pivot.position.y = -2.55;
+      pivot.rotation.y = angle;
+
+      const blade = new THREE.Group();
+      blade.position.z = 0.18;
+      blade.scale.y = 0.91 + (i % 2) * 0.045;
+      const surface = new THREE.Mesh(innerVaneGeometry, innerVaneMaterial);
+      const glow = new THREE.Mesh(innerVaneGeometry, makeGlowMaterial(angle + 1.7));
+      glow.position.z = 0.014;
+      glow.scale.setScalar(1.003);
+      glow.renderOrder = 4;
+      const spine = new THREE.Mesh(innerVaneSpineGeometry, i % 2 ? spineMaterialCool : spineMaterialWarm);
+      blade.add(surface, glow, spine);
+
+      const hinge = new THREE.Mesh(hingeJointGeometry, hingeMaterial);
+      hinge.scale.setScalar(0.72);
+      hinge.position.set(0, 0.06, 0.24);
+      const hingeRing = new THREE.Mesh(hingeRingGeometry, hingeGlowMaterial);
+      hingeRing.scale.setScalar(0.72);
+      hingeRing.position.copy(hinge.position);
+      pivot.add(blade, hinge, hingeRing);
+      pivot.userData = {
+        angle,
+        index: i,
+        phase: 0.14 + (i / innerVaneCount) * 0.035,
+        blade,
+        hingeRing,
+        glow
+      };
+      innerVanes.push(pivot);
+      innerRoot.add(pivot);
+    }
+
+    const coreShellMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xe7d5b7,
+      roughness: 0.055,
+      metalness: 0.02,
+      transmission: 0.96,
+      thickness: 1.85,
+      ior: 1.42,
+      attenuationDistance: 3.8,
+      attenuationColor: new THREE.Color(0xb8d8cf),
+      clearcoat: 1,
+      clearcoatRoughness: 0.035,
+      iridescence: 0.30,
+      iridescenceIOR: 1.2,
+      iridescenceThicknessRange: [120, 420]
+    });
+    const coreShell = new THREE.Mesh(new THREE.CapsuleGeometry(0.92, 2.25, 18, 48), coreShellMaterial);
+    coreShell.scale.set(0.92, 1.12, 0.92);
+    coreRoot.add(coreShell);
+
+    const coreGlowMaterial = new THREE.MeshBasicNodeMaterial({
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const pulse = sin(timeNode.mul(1.05)).mul(0.5).add(0.5);
+    coreGlowMaterial.colorNode = mix(color('#8bc8be'), color('#fff0c9'), pulse)
+      .mul(float(1.35).add(bloomNode.mul(0.58)));
+    coreGlowMaterial.toneMapped = false;
+    const coreGlow = new THREE.Mesh(new THREE.IcosahedronGeometry(0.56, 5), coreGlowMaterial);
+    coreRoot.add(coreGlow);
+
+    const cageMaterial = new THREE.MeshBasicMaterial({
+      color: 0xb9e5d9,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.24,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false
+    });
+    const coreCage = new THREE.Mesh(new THREE.IcosahedronGeometry(1.08, 2), cageMaterial);
+    coreCage.scale.set(0.92, 1.62, 0.92);
+    coreRoot.add(coreCage);
+
+    const innerCageMaterial = cageMaterial.clone();
+    innerCageMaterial.color.set(0xf3c984);
+    innerCageMaterial.opacity = 0.34;
+    const innerCage = new THREE.Mesh(new THREE.OctahedronGeometry(0.78, 2), innerCageMaterial);
+    innerCage.scale.y = 1.34;
+    coreRoot.add(innerCage);
+
+    const gyroRings = [];
+    const gyroTilts = [
+      [0.18, 0.28, 0.12],
+      [Math.PI * 0.5, 0.18, -0.42],
+      [0.72, Math.PI * 0.5, 0.31]
+    ];
+    for (let i = 0; i < 3; i++) {
+      const material = new THREE.MeshBasicMaterial({
+        color: i === 1 ? 0xf5d39d : 0x9fd8cd,
+        transparent: true,
+        opacity: 0.22 - i * 0.025,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false
+      });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.34 + i * 0.20, 0.025 + i * 0.004, 8, 112), material);
+      ring.rotation.set(...gyroTilts[i]);
+      ring.scale.y = 1.22 + i * 0.08;
+      ring.userData.baseRotation = new THREE.Euler(...gyroTilts[i]);
+      gyroRings.push(ring);
+      coreRoot.add(ring);
+    }
+
+    const spindleMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8f846c,
+      roughness: 0.24,
+      metalness: 0.92,
+      emissive: 0x4c351d,
+      emissiveIntensity: 0.48
+    });
+    const spindleGeometry = new THREE.CylinderGeometry(0.028, 0.028, 2.7, 8);
+    const coreSpindle = new THREE.Group();
+    for (let i = 0; i < 6; i++) {
+      const strut = new THREE.Mesh(spindleGeometry, spindleMaterial);
+      strut.rotation.z = Math.PI * 0.5;
+      strut.rotation.y = i / 6 * Math.PI;
+      strut.scale.y = 0.82 + (i % 2) * 0.16;
+      coreSpindle.add(strut);
+    }
+    coreRoot.add(coreSpindle);
+
+    const orbiters = [];
+    const orbiterGeometry = new THREE.SphereGeometry(0.055, 10, 8);
+    const orbiterMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffdc9e,
+      transparent: true,
+      opacity: 0.88,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false
+    });
+    for (let i = 0; i < 10; i++) {
+      const orbiter = new THREE.Mesh(orbiterGeometry, i % 3 === 0 ? edgeMaterial : orbiterMaterial);
+      orbiter.userData = {
+        angle: i / 10 * Math.PI * 2,
+        radius: 1.56 + (i % 3) * 0.17,
+        speed: 0.14 + (i % 4) * 0.025,
+        lift: -1.25 + (i / 9) * 2.5
+      };
+      orbiters.push(orbiter);
+      coreRoot.add(orbiter);
+    }
+
+    const coreAuraMaterial = new THREE.SpriteMaterial({
+      map: createRadialTexture([
+        [0.00, 'rgba(255,244,216,0.95)'],
+        [0.08, 'rgba(255,226,177,0.42)'],
+        [0.30, 'rgba(145,204,193,0.12)'],
+        [1.00, 'rgba(0,0,0,0)']
+      ]),
+      color: 0xffe4b7,
+      transparent: true,
+      opacity: 0.76,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const coreAura = new THREE.Sprite(coreAuraMaterial);
+    coreAura.scale.set(10.5, 10.5, 1);
+    coreRoot.add(coreAura);
+
+    function createRadialTexture(stops, size = 512) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      for (const [offset, value] of stops) gradient.addColorStop(offset, value);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function createBeamTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+      const vertical = ctx.createLinearGradient(0, 0, 0, 1024);
+      vertical.addColorStop(0, 'rgba(0,0,0,0)');
+      vertical.addColorStop(0.18, 'rgba(210,244,231,0.05)');
+      vertical.addColorStop(0.52, 'rgba(255,229,186,0.19)');
+      vertical.addColorStop(0.82, 'rgba(151,211,199,0.035)');
+      vertical.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = vertical;
+      ctx.fillRect(0, 0, 256, 1024);
+      const horizontal = ctx.createLinearGradient(0, 0, 256, 0);
+      horizontal.addColorStop(0, 'rgba(0,0,0,0)');
+      horizontal.addColorStop(0.42, 'rgba(255,255,255,0.26)');
+      horizontal.addColorStop(0.50, 'rgba(255,255,255,1)');
+      horizontal.addColorStop(0.58, 'rgba(255,255,255,0.26)');
+      horizontal.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.fillStyle = horizontal;
+      ctx.fillRect(0, 0, 256, 1024);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    const beamMaterial = new THREE.SpriteMaterial({
+      map: createBeamTexture(),
+      color: 0xf2d9aa,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const beam = new THREE.Sprite(beamMaterial);
+    beam.scale.set(9.5, 34, 1);
+    beam.position.set(0, 4.6, -8.5);
+    atmosphereRoot.add(beam);
+
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(29, 144),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x050704,
+        roughness: 0.22,
+        metalness: 0.86,
+        clearcoat: 0.92,
+        clearcoatRoughness: 0.09,
+        transparent: true,
+        opacity: 0.72,
+        side: THREE.DoubleSide
+      })
+    );
+    floor.rotation.x = -Math.PI * 0.5;
+    floor.position.y = -4.42;
+    floorRoot.add(floor);
+
+    const pedestalRoot = new THREE.Group();
+    pedestalRoot.position.y = -4.29;
+    const pedestalMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x101510,
+      roughness: 0.18,
+      metalness: 0.92,
+      clearcoat: 0.86,
+      clearcoatRoughness: 0.08
+    });
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.38, 0.22, 64, 1, false), pedestalMaterial);
+    pedestalRoot.add(pedestal);
+    const pedestalHaloMaterial = new THREE.MeshBasicMaterial({
+      color: 0xb9d9cd,
+      transparent: true,
+      opacity: 0.34,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false
+    });
+    const pedestalHalos = [];
+    for (let i = 0; i < 3; i++) {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(1.46 + i * 0.42, 0.024, 8, 112), pedestalHaloMaterial.clone());
+      halo.rotation.x = Math.PI * 0.5;
+      halo.position.y = 0.13 - i * 0.008;
+      halo.material.opacity = 0.28 - i * 0.055;
+      pedestalHalos.push(halo);
+      pedestalRoot.add(halo);
+    }
+    const spokeGeometry = new THREE.BoxGeometry(2.35, 0.045, 0.075);
+    for (let i = 0; i < 12; i++) {
+      const spoke = new THREE.Mesh(spokeGeometry, i % 3 === 0 ? spineMaterialWarm : hingeMaterial);
+      const angle = i / 12 * Math.PI * 2;
+      spoke.rotation.y = -angle;
+      spoke.position.set(Math.cos(angle) * 1.75, 0.085, Math.sin(angle) * 1.75);
+      pedestalRoot.add(spoke);
+    }
+    floorRoot.add(pedestalRoot);
+
+    const poolTexture = createRadialTexture([
+      [0.00, 'rgba(255,239,205,0.86)'],
+      [0.10, 'rgba(245,211,158,0.28)'],
+      [0.34, 'rgba(137,201,190,0.10)'],
+      [0.70, 'rgba(80,119,108,0.025)'],
+      [1.00, 'rgba(0,0,0,0)']
+    ], 1024);
+    const poolMaterial = new THREE.MeshBasicMaterial({
+      map: poolTexture,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.66,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    });
+    const lightPool = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), poolMaterial);
+    lightPool.rotation.x = -Math.PI * 0.5;
+    lightPool.position.y = -4.385;
+    floorRoot.add(lightPool);
+
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0xd8eadf,
+      transparent: true,
+      opacity: 0.075,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    });
+    const floorRings = [];
+    for (let i = 0; i < 3; i++) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(2.2 + i * 2.5, 2.23 + i * 2.5, 160), ringMaterial.clone());
+      ring.rotation.x = -Math.PI * 0.5;
+      ring.position.y = -4.36 + i * 0.004;
+      ring.material.opacity = 0.082 - i * 0.018;
+      floorRings.push(ring);
+      floorRoot.add(ring);
+    }
+
+    const dustMaterial = new THREE.SpriteNodeMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    dustMaterial.positionNode = range(vec3(-24, -8, -24), vec3(24, 20, 16));
+    dustMaterial.scaleNode = range(0.025, 0.095);
+    const dustPulse = sin(timeNode.mul(range(0.16, 0.58)).add(range(0, Math.PI * 2)))
+      .mul(0.5).add(0.5);
+    const dustAlpha = float(0.022)
+      .div(uv().sub(0.5).length().add(0.024))
+      .sub(0.13)
+      .mul(dustPulse.mul(0.42).add(0.08));
+    dustMaterial.colorNode = vec4(
+      mix(color('#88c4ba'), color('#f3d6a6'), range(0, 1)),
+      dustAlpha
+    );
+    dustMaterial.toneMapped = false;
+    const dust = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), dustMaterial, 230);
+    dust.frustumCulled = false;
+    atmosphereRoot.add(dust);
+
+    const ambient = new THREE.HemisphereLight(0xf5e7cf, 0x0b110c, 0.34);
+    const key = new THREE.DirectionalLight(0xfff4dd, 5.8);
+    key.position.set(8, 14, 11);
+    const coreLight = new THREE.PointLight(0xffd9a0, 58, 38, 2);
+    coreLight.position.set(0, 0.2, 0);
+    const coolRim = new THREE.PointLight(0x75b8ad, 34, 42, 2);
+    coolRim.position.set(-8, 2, -5);
+    const sideFill = new THREE.PointLight(0xd9f3e9, 14, 34, 2);
+    sideFill.position.set(10, -1, 6);
+    scene.add(ambient, key, coreLight, coolRim, sideFill);
+
+    const pipeline = new THREE.RenderPipeline(renderer);
+    const scenePass = pass(scene, camera);
+    const sceneColor = scenePass.getTextureNode('output');
+    const bloomPass = bloom(sceneColor);
+    bloomPass.threshold.value = 0.34;
+    bloomPass.strength.value = 0.92;
+    bloomPass.radius.value = 0.58;
+    pipeline.outputNode = sceneColor.add(bloomPass);
+
+    const cameraPath = [
+      { p: 0.00, yaw: -0.50, pitch: -0.015, radius: 27.0, targetY: 0.3, lookX: -1.75, lookY: 0.55, lookZ: 0.1 },
+      { p: 0.50, yaw: 0.58, pitch: 0.10, radius: 22.0, targetY: 0.5, lookX: 0.45, lookY: 0.45, lookZ: 0.0 },
+      { p: 1.00, yaw: -0.16, pitch: 0.34, radius: 19.2, targetY: 1.0, lookX: 0.0, lookY: -0.25, lookZ: 0.35 }
+    ];
+
+    const scrollState = { progress: 0, active: 0 };
+    const pointer = new THREE.Vector2();
+    const pointerSmooth = new THREE.Vector2();
+    const lookTarget = new THREE.Vector3();
+    const irisDebug = {
+      renderer: 'WebGPURenderer',
+      backend: renderer.backend?.constructor?.name || 'unknown',
+      requestedBackend: forceWebGL ? 'webgl' : 'webgpu',
+      primaryBladeCount: petals.length,
+      innerVaneCount: innerVanes.length,
+      gyroAxisCount: gyroRings.length,
+      orbiterCount: orbiters.length,
+      progress: 0,
+      openness: 0,
+      motionTime: 0,
+      playing
+    };
+    window.__IRIS_DEBUG__ = irisDebug;
+
+    function sampleCamera(progress) {
+      const right = progress <= 0.5 ? cameraPath[1] : cameraPath[2];
+      const left = progress <= 0.5 ? cameraPath[0] : cameraPath[1];
+      const t = THREE.MathUtils.smoothstep(
+        (progress - left.p) / Math.max(0.0001, right.p - left.p),
+        0,
+        1
+      );
+      return {
+        yaw: THREE.MathUtils.lerp(left.yaw, right.yaw, t),
+        pitch: THREE.MathUtils.lerp(left.pitch, right.pitch, t),
+        radius: THREE.MathUtils.lerp(left.radius, right.radius, t),
+        targetY: THREE.MathUtils.lerp(left.targetY, right.targetY, t),
+        lookX: THREE.MathUtils.lerp(left.lookX, right.lookX, t),
+        lookY: THREE.MathUtils.lerp(left.lookY, right.lookY, t),
+        lookZ: THREE.MathUtils.lerp(left.lookZ, right.lookZ, t)
+      };
+    }
+
+    function updateScroll(source) {
+      const max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+      const progress = source && Number.isFinite(source.scroll) && Number.isFinite(source.limit)
+        ? source.scroll / Math.max(1, source.limit)
+        : scrollY / max;
+      scrollState.progress = THREE.MathUtils.clamp(progress, 0, 1);
+      progressBar.style.transform = `scaleX(${scrollState.progress})`;
+
+      const active = scrollState.progress < 0.25 ? 0 : scrollState.progress < 0.75 ? 1 : 2;
+      if (active !== scrollState.active || !document.body.dataset.section) {
+        scrollState.active = active;
+        document.body.dataset.section = String(active);
+        navLinks.forEach((link, index) => {
+          if (index === active) link.setAttribute('aria-current', 'true');
+          else link.removeAttribute('aria-current');
+        });
+      }
+
+      const cueVisible = scrollState.progress < 0.035;
+      scrollCue.style.opacity = cueVisible ? '1' : '0';
+      scrollCue.style.transform = cueVisible ? 'translateY(0)' : 'translateY(8px)';
+    }
+
+    if (!prefersReducedMotion) {
+      lenis = new Lenis({
+        autoRaf: false,
+        autoResize: true,
+        smoothWheel: true,
+        syncTouch: false,
+        lerp: 0.10,
+        wheelMultiplier: 0.78,
+        touchMultiplier: 1,
+        overscroll: false,
+        stopInertiaOnNavigate: true
+      });
+      lenis.on('scroll', updateScroll);
+    } else {
+      addEventListener('scroll', updateScroll, { passive: true });
+    }
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) entry.target.classList.add('is-visible');
+      }
+    }, { threshold: 0.34 });
+    sections.forEach(section => revealObserver.observe(section));
+
+    function scrollToTarget(target) {
+      const element = typeof target === 'string' ? document.querySelector(target) : target;
+      if (!element) return;
+      if (lenis) lenis.scrollTo(element, { lerp: 0.085, lock: false });
+      else element.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    }
+
+    document.querySelectorAll('[data-scroll-to]').forEach(link => {
+      link.addEventListener('click', event => {
+        event.preventDefault();
+        scrollToTarget(link.hash);
+      });
+    });
+
+    document.querySelectorAll('[data-target]').forEach(button => {
+      button.addEventListener('click', () => scrollToTarget(button.dataset.target));
+    });
+
+    restartButton.addEventListener('click', () => scrollToTarget('#threshold'));
+
+    function resetBloom() {
+      elapsed = 0;
+      pointer.set(0, 0);
+      pointerSmooth.set(0, 0);
+      world.rotation.set(0, 0, 0);
+      bloomRoot.rotation.set(0, 0, 0);
+      coreRoot.rotation.set(0, 0, 0);
+    }
+
+    resetButton.addEventListener('click', () => {
+      resetBloom();
+      scrollToTarget('#threshold');
+    });
+    resetViewButton.addEventListener('click', resetBloom);
+
+    pauseButton.addEventListener('click', () => {
+      playing = !playing;
+      pauseButton.classList.toggle('is-paused', !playing);
+      pauseButton.setAttribute('aria-pressed', String(!playing));
+      pauseButton.setAttribute('aria-label', playing ? 'Pause animation' : 'Play animation');
+    });
+
+    addEventListener('pointermove', event => {
+      if (event.pointerType === 'touch') return;
+      pointer.x = (event.clientX / innerWidth) * 2 - 1;
+      pointer.y = (event.clientY / innerHeight) * 2 - 1;
+    }, { passive: true });
+
+    function onResize() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.fov = camera.aspect < 0.72 ? 48 : camera.aspect > 1.7 ? 37 : 40;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(renderScale());
+      renderer.setSize(innerWidth, innerHeight);
+      lenis?.resize();
+      updateScroll(lenis);
+    }
+    addEventListener('resize', onResize, { passive: true });
+
+    function render(now) {
+      lenis?.raf(now);
+
+      const delta = Math.min((now - previousTime) / 1000, 0.05);
+      previousTime = now;
+      if (playing) elapsed += delta;
+      timeNode.value = elapsed;
+      bloomNode.value = scrollState.progress;
+
+      pointerSmooth.lerp(pointer, 1 - Math.exp(-delta * 4.2));
+      const framing = sampleCamera(scrollState.progress);
+      const drift = playing ? Math.sin(elapsed * 0.10) * 0.018 : 0;
+      const yaw = framing.yaw + pointerSmooth.x * 0.048 + drift;
+      const pitch = framing.pitch - pointerSmooth.y * 0.026;
+      const portraitScale = camera.aspect < 0.72 ? 1.30 : camera.aspect > 1.75 ? 0.96 : 1;
+      const radius = framing.radius * portraitScale;
+      const horizontal = Math.cos(pitch) * radius;
+
+      camera.position.set(
+        Math.sin(yaw) * horizontal,
+        framing.targetY + Math.sin(pitch) * radius,
+        Math.cos(yaw) * horizontal
+      );
+      lookTarget.set(framing.lookX, framing.lookY, framing.lookZ);
+      camera.lookAt(lookTarget);
+
+      const motion = elapsed;
+      const scroll = scrollState.progress;
+      const open = THREE.MathUtils.smootherstep(scroll, 0.035, 0.94);
+      world.position.y = camera.aspect < 0.72 ? 0.42 : 0;
+      world.rotation.x = pointerSmooth.y * 0.012;
+      world.rotation.y = motion * 0.006 + scroll * 0.16 + pointerSmooth.x * 0.015;
+      world.rotation.z = Math.sin(motion * 0.13) * 0.008;
+
+      for (const pivot of petals) {
+        const data = pivot.userData;
+        const localProgress = THREE.MathUtils.clamp(
+          (scroll - data.phase) / Math.max(0.001, 0.90 - data.phase),
+          0,
+          1
+        );
+        const localOpen = THREE.MathUtils.smootherstep(localProgress, 0, 1);
+        const release = Math.sin(localOpen * Math.PI) * 0.085;
+        const breathe = Math.sin(motion * 0.46 + data.angle * 2.1) * 0.028 * (0.28 + localOpen * 0.72);
+        pivot.rotation.y = data.angle + Math.sin(motion * 0.12 + data.angle) * 0.014;
+        pivot.rotation.x = 0.055 + localOpen * (0.95 + Math.sin(data.angle * 2) * 0.075) + release + breathe;
+        pivot.rotation.z = Math.sin(data.angle * 3 + motion * 0.24) * 0.026 * (0.25 + localOpen);
+        pivot.position.y = -4.35 + localOpen * 0.22;
+        const scalePulse = 1 + Math.sin(motion * 0.33 + data.angle) * 0.007 * (0.3 + localOpen);
+        pivot.scale.setScalar(scalePulse);
+        data.blade.rotation.y = Math.sin(motion * 0.31 + data.angle * 1.7) * 0.018 * localOpen;
+        data.blade.rotation.z = Math.sin(motion * 0.38 + data.angle * 2.4) * 0.024 * (0.2 + localOpen);
+        data.blade.position.y = Math.sin(motion * 0.42 + data.angle) * 0.025 * localOpen;
+        data.hinge.rotation.y = motion * (data.index % 2 ? -0.28 : 0.24);
+        data.hingeRing.rotation.z = motion * (data.index % 2 ? 0.36 : -0.32) + localOpen * Math.PI;
+        data.hingeRing.scale.setScalar(0.92 + localOpen * 0.15 + Math.sin(motion * 0.8 + data.angle) * 0.025);
+        data.glow.material.opacity = 0.075 + localOpen * 0.085 + Math.sin(motion * 0.65 + data.angle) * 0.012;
+      }
+
+      innerRoot.rotation.y = motion * 0.012 - scroll * 0.10;
+      for (const pivot of innerVanes) {
+        const data = pivot.userData;
+        const localProgress = THREE.MathUtils.clamp(
+          (scroll - data.phase) / Math.max(0.001, 0.91 - data.phase),
+          0,
+          1
+        );
+        const localOpen = THREE.MathUtils.smootherstep(localProgress, 0, 1);
+        const release = Math.sin(localOpen * Math.PI) * 0.12;
+        const breathe = Math.sin(motion * 0.64 + data.angle * 1.6) * 0.035 * (0.2 + localOpen);
+        pivot.rotation.y = data.angle - Math.sin(motion * 0.18 + data.angle) * 0.018;
+        pivot.rotation.x = 0.08 + localOpen * (1.08 + Math.sin(data.angle * 3) * 0.055) + release + breathe;
+        pivot.rotation.z = Math.sin(motion * 0.46 + data.angle * 2) * 0.03 * localOpen;
+        pivot.position.y = -2.55 + localOpen * 0.16;
+        data.blade.rotation.y = -Math.sin(motion * 0.42 + data.angle) * 0.026 * localOpen;
+        data.blade.rotation.z = Math.cos(motion * 0.38 + data.angle * 1.5) * 0.034 * (0.15 + localOpen);
+        data.hingeRing.rotation.z = -motion * 0.52 + data.index * 0.3 + localOpen * Math.PI * 1.5;
+        data.glow.material.opacity = 0.09 + localOpen * 0.11;
+      }
+
+      bloomRoot.rotation.y = -motion * 0.008 + scroll * 0.08;
+      coreRoot.position.y = -1.42 + open * 1.76 + Math.sin(motion * 0.48) * (0.028 + open * 0.05);
+      coreRoot.rotation.y = motion * 0.105;
+      coreRoot.rotation.x = Math.sin(motion * 0.21) * 0.035 * open;
+      coreShell.rotation.z = Math.sin(motion * 0.24) * 0.04;
+      coreShell.scale.set(0.92 + open * 0.035, 1.12 + Math.sin(motion * 0.44) * 0.025, 0.92 + open * 0.035);
+      const coreScale = 0.82 + open * 0.31 + Math.sin(motion * 0.86) * 0.022;
+      coreGlow.scale.setScalar(coreScale);
+      const auraScale = (9.8 + open * 3.6) * (1 + Math.sin(motion * 0.52) * 0.025);
+      coreAura.scale.set(auraScale, auraScale, 1);
+      coreAuraMaterial.opacity = 0.38 + open * 0.38 + Math.sin(motion * 0.52) * 0.035;
+
+      const cagePulse = 1 + Math.sin(motion * 0.72) * 0.025;
+      coreCage.rotation.x = motion * 0.075;
+      coreCage.rotation.y = -motion * 0.13;
+      coreCage.rotation.z = motion * 0.045;
+      coreCage.scale.set(0.92 * cagePulse, 1.62 * cagePulse, 0.92 * cagePulse);
+      cageMaterial.opacity = 0.12 + open * 0.19;
+      innerCage.rotation.x = -motion * 0.18;
+      innerCage.rotation.y = motion * 0.22;
+      innerCage.rotation.z = -motion * 0.11;
+      innerCage.scale.setScalar(0.92 + open * 0.12 + Math.sin(motion * 0.94) * 0.018);
+      innerCage.scale.y *= 1.34;
+      innerCageMaterial.opacity = 0.18 + open * 0.23;
+      coreSpindle.rotation.x = motion * 0.12;
+      coreSpindle.rotation.z = -motion * 0.16;
+      coreSpindle.scale.setScalar(0.72 + open * 0.34);
+
+      gyroRings.forEach((ring, index) => {
+        const base = ring.userData.baseRotation;
+        const direction = index % 2 ? -1 : 1;
+        ring.rotation.x = base.x + motion * (0.055 + index * 0.025) * direction;
+        ring.rotation.y = base.y + motion * (0.11 + index * 0.018) * -direction;
+        ring.rotation.z = base.z + motion * (0.07 + index * 0.022) * direction;
+        const reveal = 0.72 + open * 0.34 + Math.sin(motion * 0.62 + index) * 0.015;
+        ring.scale.set(reveal, reveal * (1.22 + index * 0.08), reveal);
+        ring.material.opacity = (0.09 + open * 0.19) * (1 - index * 0.08);
+      });
+
+      orbiters.forEach((orbiter, index) => {
+        const data = orbiter.userData;
+        const angle = data.angle + motion * data.speed * (index % 2 ? -1 : 1);
+        const radius = data.radius * (0.72 + open * 0.28);
+        orbiter.position.set(
+          Math.cos(angle) * radius,
+          data.lift + Math.sin(angle * 1.7 + motion * 0.23) * 0.16,
+          Math.sin(angle) * radius
+        );
+        orbiter.scale.setScalar(0.34 + open * 0.78 + Math.sin(motion * 1.1 + index) * 0.08);
+      });
+
+      beam.scale.x = 7.4 + open * 4.8;
+      beam.material.opacity = 0.10 + open * 0.19;
+      beam.position.y = 3.9 + open * 0.7;
+      lightPool.scale.setScalar(0.84 + open * 0.35 + Math.sin(motion * 0.18) * 0.012);
+      poolMaterial.opacity = 0.35 + open * 0.40;
+
+      floorRings.forEach((ring, index) => {
+        const pulseScale = 0.96 + open * 0.10 + Math.sin(motion * (0.13 + index * 0.018) + index) * 0.012;
+        ring.scale.setScalar(pulseScale);
+        ring.rotation.z = motion * (index % 2 ? -0.018 : 0.014);
+        ring.material.opacity = (0.045 + open * 0.045) * (1 - index * 0.18);
+      });
+
+      pedestalRoot.rotation.y = -motion * 0.018;
+      pedestalHalos.forEach((halo, index) => {
+        const pulseScale = 0.96 + open * (0.07 + index * 0.015) + Math.sin(motion * 0.32 + index) * 0.012;
+        halo.scale.setScalar(pulseScale);
+        halo.rotation.z = motion * (index % 2 ? -0.12 : 0.09);
+        halo.material.opacity = (0.13 + open * 0.19) * (1 - index * 0.13);
+      });
+
+      dust.rotation.y = motion * 0.0018;
+      dust.position.y = Math.sin(motion * 0.09) * 0.18;
+
+      const phaseColor = scroll < 0.5
+        ? bgA.clone().lerp(bgB, scroll * 2)
+        : bgB.clone().lerp(bgC, (scroll - 0.5) * 2);
+      scene.background.copy(phaseColor);
+      scene.fog.color.copy(phaseColor).lerp(fogTint, 0.16);
+      scene.fog.density = THREE.MathUtils.lerp(0.0145, 0.0118, open);
+      renderer.toneMappingExposure = 1.00 + open * 0.11;
+      bloomPass.strength.value = 0.82 + open * 0.31 + Math.sin(motion * 0.38) * 0.018;
+      coreLight.intensity = 34 + open * 38 + Math.sin(motion * 0.65) * 2.0;
+      coolRim.intensity = 26 + open * 14;
+
+      irisDebug.progress = Number(scroll.toFixed(4));
+      irisDebug.openness = Number(open.toFixed(4));
+      irisDebug.motionTime = Number(motion.toFixed(3));
+      irisDebug.playing = playing;
+      irisDebug.coreY = Number(coreRoot.position.y.toFixed(3));
+      irisDebug.primaryBladeAngle = Number(petals[0].rotation.x.toFixed(3));
+      irisDebug.innerVaneAngle = Number(innerVanes[0].rotation.x.toFixed(3));
+      if (now - telemetryStamp >= 120) {
+        telemetryStamp = now;
+        document.body.dataset.backend = irisDebug.backend;
+        document.body.dataset.motionTime = String(irisDebug.motionTime);
+        document.body.dataset.openness = String(irisDebug.openness);
+        document.body.dataset.primaryBladeAngle = String(irisDebug.primaryBladeAngle);
+        document.body.dataset.innerVaneAngle = String(irisDebug.innerVaneAngle);
+      }
+
+      pipeline.render();
+
+      if (!sceneReady) {
+        sceneReady = true;
+        window.__irisReady = true;
+        document.body.dataset.ready = 'true';
+        document.body.classList.remove('is-loading');
+        requestAnimationFrame(() => loader.classList.add('hidden'));
+      }
+    }
+
+    updateScroll();
+    renderer.setAnimationLoop(render);
+  </script>
+
+  <script>
+    const year = document.getElementById('current-year');
+    if (year) year.textContent = String(new Date().getFullYear());
+
+    setTimeout(() => {
+      if (window.__irisReady) return;
+      document.body.classList.remove('is-loading');
+      document.getElementById('loader')?.classList.add('hidden');
+    }, 8000);
+  </script>
+</body>
+</html>
+
+
